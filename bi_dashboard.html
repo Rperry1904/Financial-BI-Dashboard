@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Trend Report — BI Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #161c2c;
+    --border: #1e2740;
+    --accent: #4f8ef7;
+    --accent2: #7c5cff;
+    --accent3: #00d4aa;
+    --warn: #ff6b6b;
+    --text: #e8eaf2;
+    --muted: #6b7494;
+    --chart-grid: rgba(255,255,255,0.04);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid lines */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(79,142,247,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,142,247,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; }
+
+  /* HEADER */
+  header {
+    padding: 28px 40px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+  }
+
+  .header-left h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #fff;
+  }
+
+  .header-left p {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .header-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(79,142,247,0.1);
+    border: 1px solid rgba(79,142,247,0.25);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent3);
+    box-shadow: 0 0 8px var(--accent3);
+    animation: pulse 2s ease infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* CONTROLS */
+  .controls {
+    padding: 20px 40px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .control-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-right: 4px;
+  }
+
+  select, .btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  select:hover, .btn:hover {
+    border-color: var(--accent);
+    background: rgba(79,142,247,0.08);
+  }
+
+  .btn.active {
+    background: rgba(79,142,247,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* KPI ROW */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    margin: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    padding: 24px 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .kpi-card:nth-child(2)::after { background: var(--accent2); }
+  .kpi-card:nth-child(3)::after { background: var(--accent3); }
+  .kpi-card:nth-child(4)::after { background: var(--warn); }
+
+  .kpi-card:hover::after { opacity: 1; }
+
+  .kpi-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .kpi-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  .kpi-trend {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-top: 6px;
+  }
+
+  .trend-up { background: rgba(0,212,170,0.12); color: var(--accent3); }
+  .trend-dn { background: rgba(255,107,107,0.12); color: var(--warn); }
+
+  /* GRID */
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    padding: 0;
+  }
+
+  .chart-panel {
+    background: var(--surface);
+    padding: 28px 32px;
+    position: relative;
+  }
+
+  .chart-panel.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 22px;
+  }
+
+  .panel-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.3px;
+  }
+
+  .panel-sub {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .panel-tag {
+    font-size: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  canvas { display: block; }
+
+  /* ENTITY TABLE */
+  .entity-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .entity-table th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+
+  .entity-table th:not(:first-child) { text-align: right; }
+
+  .entity-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    color: var(--text);
+  }
+
+  .entity-table td:not(:first-child) { text-align: right; }
+
+  .entity-table tr:hover td { background: rgba(79,142,247,0.04); }
+
+  .entity-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+
+  .positive { color: var(--accent3); }
+  .negative { color: var(--warn); }
+
+  .bar-mini {
+    display: inline-block;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--accent);
+    vertical-align: middle;
+    opacity: 0.6;
+  }
+
+  /* FOOTER */
+  footer {
+    padding: 20px 40px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: 1fr 1fr; }
+    .dashboard-grid { grid-template-columns: 1fr; }
+    header { padding: 20px; flex-direction: column; align-items: flex-start; }
+    .controls { padding: 16px 20px; }
+    .chart-panel { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <div class="header-left">
+    <h1>Financial Trend Report</h1>
+    <p>Multi-Entity Balance Sheet Analysis · USD · 2022 – 2026</p>
+  </div>
+  <div class="header-badge">
+    <span class="dot"></span>
+    Anonymized Dataset · Demo Mode
+  </div>
+</header>
+
+<div class="controls">
+  <span class="control-label">Entity:</span>
+  <select id="entityFilter" onchange="updateDashboard()">
+    <option value="all">All Entities</option>
+  </select>
+  <span class="control-label" style="margin-left:8px">Year:</span>
+  <select id="yearFilter" onchange="updateDashboard()">
+    <option value="all">All Years</option>
+    <option value="2022">2022</option>
+    <option value="2023">2023</option>
+    <option value="2024">2024</option>
+    <option value="2025">2025</option>
+    <option value="2026">2026</option>
+  </select>
+  <span class="control-label" style="margin-left:8px">View:</span>
+  <button class="btn active" id="btnMonthly" onclick="setView('monthly')">Monthly</button>
+  <button class="btn" id="btnAnnual" onclick="setView('annual')">Annual</button>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi-card">
+    <div class="kpi-label">Total Net Position</div>
+    <div class="kpi-value" id="kpi1">—</div>
+    <div class="kpi-sub">Across all entities / periods</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Avg. Monthly Movement</div>
+    <div class="kpi-value" id="kpi2">—</div>
+    <div class="kpi-sub">Mean period activity</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Peak Month</div>
+    <div class="kpi-value" id="kpi3">—</div>
+    <div class="kpi-sub" id="kpi3sub">Highest single period</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Active Entities</div>
+    <div class="kpi-value" id="kpi4">—</div>
+    <div class="kpi-sub">With non-zero activity</div>
+  </div>
+</div>
+
+<div class="dashboard-grid">
+
+  <div class="chart-panel full-width">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Trend Overview — Net Position Over Time</div>
+        <div class="panel-sub">Aggregate monthly balance movement by entity</div>
+      </div>
+      <div class="panel-tag" id="trendLabel">Monthly</div>
+    </div>
+    <canvas id="trendChart" height="90"></canvas>
+  </div>
+
+  <div class="chart-panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Entity Comparison</div>
+        <div class="panel-sub">Total net position by entity</div>
+      </div>
+      <div class="panel-tag">Bar</div>
+    </div>
+    <canvas id="entityBar" height="200"></canvas>
+  </div>
+
+  <div class="chart-panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Entity Mix</div>
+        <div class="panel-sub">Proportion by absolute value</div>
+      </div>
+      <div class="panel-tag">Donut</div>
+    </div>
+    <canvas id="entityDoughnut" height="200"></canvas>
+  </div>
+
+  <div class="chart-panel full-width">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Entity Performance Summary</div>
+        <div class="panel-sub">Net total, monthly average, and trend direction</div>
+      </div>
+    </div>
+    <table class="entity-table" id="summaryTable">
+      <thead>
+        <tr>
+          <th>Entity</th>
+          <th>Total Net Position</th>
+          <th>Avg / Month</th>
+          <th>Activity Bar</th>
+          <th>Direction</th>
+        </tr>
+      </thead>
+      <tbody id="summaryTbody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<footer>
+  <span>BI Dashboard · Financial Trend Analysis · Anonymized Demo Data</span>
+  <span id="footerInfo">Jan 2022 – Jan 2026 · 11 Entities · 463 Records</span>
+</footer>
+
+</div>
+
+<script>
+// ---- DATA ----
+const RAW_DATA = {"entities":["Apex Canada Inc","Apex Industries NA","Apex Mexico","Apex Motorsports Inc","Apex Racing NA","Horizon Mobility","Summit Motorsports Inc","Summit Products NA","TechSuspension NA","Vega Motors Group","Velocity Brands NA"],"monthly":[{"entity":"Apex Canada Inc","period":"2022-01","year":2022,"month":1,"total_value":-38945.76},{"entity":"Apex Canada Inc","period":"2022-02","year":2022,"month":2,"total_value":12420.96},{"entity":"Apex Canada Inc","period":"2022-03","year":2022,"month":3,"total_value":17438.97},{"entity":"Apex Canada Inc","period":"2022-04","year":2022,"month":4,"total_value":38085.12},{"entity":"Apex Canada Inc","period":"2022-05","year":2022,"month":5,"total_value":111887.53},{"entity":"Apex Canada Inc","period":"2022-06","year":2022,"month":6,"total_value":-7052.89},{"entity":"Apex Canada Inc","period":"2022-07","year":2022,"month":7,"total_value":46451.58},{"entity":"Apex Canada Inc","period":"2022-08","year":2022,"month":8,"total_value":-158082.63},{"entity":"Apex Canada Inc","period":"2022-09","year":2022,"month":9,"total_value":209380.23},{"entity":"Apex Canada Inc","period":"2022-10","year":2022,"month":10,"total_value":107028.64},{"entity":"Apex Canada Inc","period":"2022-11","year":2022,"month":11,"total_value":41867.03},{"entity":"Apex Canada Inc","period":"2022-12","year":2022,"month":12,"total_value":-9519.77},{"entity":"Apex Canada Inc","period":"2023-01","year":2023,"month":1,"total_value":-40199.9},{"entity":"Apex Canada Inc","period":"2023-02","year":2023,"month":2,"total_value":-88483.93},{"entity":"Apex Canada Inc","period":"2023-03","year":2023,"month":3,"total_value":113009.96},{"entity":"Apex Canada Inc","period":"2023-04","year":2023,"month":4,"total_value":-46063.56},{"entity":"Apex Canada Inc","period":"2023-05","year":2023,"month":5,"total_value":-86437.51},{"entity":"Apex Canada Inc","period":"2023-06","year":2023,"month":6,"total_value":-196826.88},{"entity":"Apex Canada Inc","period":"2023-07","year":2023,"month":7,"total_value":16888.44},{"entity":"Apex Canada Inc","period":"2023-08","year":2023,"month":8,"total_value":-116012.05},{"entity":"Apex Canada Inc","period":"2023-09","year":2023,"month":9,"total_value":-213484.91},{"entity":"Apex Canada Inc","period":"2023-10","year":2023,"month":10,"total_value":-31948.66},{"entity":"Apex Canada Inc","period":"2023-11","year":2023,"month":11,"total_value":-17498.77},{"entity":"Apex Canada Inc","period":"2023-12","year":2023,"month":12,"total_value":-107348.41},{"entity":"Apex Canada Inc","period":"2024-01","year":2024,"month":1,"total_value":-167574.84},{"entity":"Apex Canada Inc","period":"2024-02","year":2024,"month":2,"total_value":171395.62},{"entity":"Apex Canada Inc","period":"2024-03","year":2024,"month":3,"total_value":-127571.02},{"entity":"Apex Canada Inc","period":"2024-04","year":2024,"month":4,"total_value":155023.78},{"entity":"Apex Canada Inc","period":"2024-05","year":2024,"month":5,"total_value":20668.74},{"entity":"Apex Canada Inc","period":"2024-06","year":2024,"month":6,"total_value":-214501.2},{"entity":"Apex Canada Inc","period":"2024-07","year":2024,"month":7,"total_value":-226699.1},{"entity":"Apex Canada Inc","period":"2024-08","year":2024,"month":8,"total_value":-59083.31},{"entity":"Apex Canada Inc","period":"2024-09","year":2024,"month":9,"total_value":-101597.37},{"entity":"Apex Canada Inc","period":"2024-10","year":2024,"month":10,"total_value":-164671.06},{"entity":"Apex Canada Inc","period":"2024-11","year":2024,"month":11,"total_value":11893.03},{"entity":"Apex Canada Inc","period":"2024-12","year":2024,"month":12,"total_value":3.7},{"entity":"Apex Canada Inc","period":"2025-01","year":2025,"month":1,"total_value":23484.78},{"entity":"Apex Canada Inc","period":"2025-02","year":2025,"month":2,"total_value":-22940.72},{"entity":"Apex Canada Inc","period":"2025-03","year":2025,"month":3,"total_value":25600.89},{"entity":"Apex Canada Inc","period":"2025-04","year":2025,"month":4,"total_value":-12498.78},{"entity":"Apex Canada Inc","period":"2025-05","year":2025,"month":5,"total_value":-82449.84},{"entity":"Apex Canada Inc","period":"2025-06","year":2025,"month":6,"total_value":132474.87},{"entity":"Apex Canada Inc","period":"2025-07","year":2025,"month":7,"total_value":65498.12},{"entity":"Apex Canada Inc","period":"2025-08","year":2025,"month":8,"total_value":23438.1},{"entity":"Apex Canada Inc","period":"2025-09","year":2025,"month":9,"total_value":80890.58},{"entity":"Apex Canada Inc","period":"2025-10","year":2025,"month":10,"total_value":73888.49},{"entity":"Apex Canada Inc","period":"2025-11","year":2025,"month":11,"total_value":-29642.16},{"entity":"Apex Canada Inc","period":"2025-12","year":2025,"month":12,"total_value":74437.8},{"entity":"Apex Canada Inc","period":"2026-01","year":2026,"month":1,"total_value":98815.84},{"entity":"Apex Industries NA","period":"2022-01","year":2022,"month":1,"total_value":1284684.84},{"entity":"Apex Industries NA","period":"2022-02","year":2022,"month":2,"total_value":-428126.3},{"entity":"Apex Industries NA","period":"2022-03","year":2022,"month":3,"total_value":578174.83},{"entity":"Apex Industries NA","period":"2022-04","year":2022,"month":4,"total_value":-346695.88},{"entity":"Apex Industries NA","period":"2022-05","year":2022,"month":5,"total_value":1143636.74},{"entity":"Apex Industries NA","period":"2022-06","year":2022,"month":6,"total_value":-1025456.16},{"entity":"Apex Industries NA","period":"2022-07","year":2022,"month":7,"total_value":2145871.06},{"entity":"Apex Industries NA","period":"2022-08","year":2022,"month":8,"total_value":-1218467.92},{"entity":"Apex Industries NA","period":"2022-09","year":2022,"month":9,"total_value":814093.31},{"entity":"Apex Industries NA","period":"2022-10","year":2022,"month":10,"total_value":-1052888.65},{"entity":"Apex Industries NA","period":"2022-11","year":2022,"month":11,"total_value":2203069.16},{"entity":"Apex Industries NA","period":"2022-12","year":2022,"month":12,"total_value":-1226754.23},{"entity":"Apex Industries NA","period":"2023-01","year":2023,"month":1,"total_value":487547.9},{"entity":"Apex Industries NA","period":"2023-02","year":2023,"month":2,"total_value":1081660.63},{"entity":"Apex Industries NA","period":"2023-03","year":2023,"month":3,"total_value":-1031960.17},{"entity":"Apex Industries NA","period":"2023-04","year":2023,"month":4,"total_value":694217.23},{"entity":"Apex Industries NA","period":"2023-05","year":2023,"month":5,"total_value":-626126.63},{"entity":"Apex Industries NA","period":"2023-06","year":2023,"month":6,"total_value":1062820.64},{"entity":"Apex Industries NA","period":"2023-07","year":2023,"month":7,"total_value":-440009.02},{"entity":"Apex Industries NA","period":"2023-08","year":2023,"month":8,"total_value":590015.83},{"entity":"Apex Industries NA","period":"2023-09","year":2023,"month":9,"total_value":-633660.1},{"entity":"Apex Industries NA","period":"2023-10","year":2023,"month":10,"total_value":-71266.82},{"entity":"Apex Industries NA","period":"2023-11","year":2023,"month":11,"total_value":-201019.25},{"entity":"Apex Industries NA","period":"2023-12","year":2023,"month":12,"total_value":-1055455.68},{"entity":"Apex Industries NA","period":"2024-01","year":2024,"month":1,"total_value":-1015534.82},{"entity":"Apex Industries NA","period":"2024-02","year":2024,"month":2,"total_value":1041018.53},{"entity":"Apex Industries NA","period":"2024-03","year":2024,"month":3,"total_value":1299427.71},{"entity":"Apex Industries NA","period":"2024-04","year":2024,"month":4,"total_value":-561434.43},{"entity":"Apex Industries NA","period":"2024-05","year":2024,"month":5,"total_value":769753.5},{"entity":"Apex Industries NA","period":"2024-06","year":2024,"month":6,"total_value":-1284175.04},{"entity":"Apex Industries NA","period":"2024-07","year":2024,"month":7,"total_value":2428706.1},{"entity":"Apex Industries NA","period":"2024-08","year":2024,"month":8,"total_value":-2046413.75},{"entity":"Apex Industries NA","period":"2024-09","year":2024,"month":9,"total_value":756987.81},{"entity":"Apex Industries NA","period":"2024-10","year":2024,"month":10,"total_value":-1056905.53},{"entity":"Apex Industries NA","period":"2024-11","year":2024,"month":11,"total_value":1006813.17},{"entity":"Apex Industries NA","period":"2024-12","year":2024,"month":12,"total_value":1200248.53},{"entity":"Apex Industries NA","period":"2025-01","year":2025,"month":1,"total_value":-374555.55},{"entity":"Apex Industries NA","period":"2025-02","year":2025,"month":2,"total_value":1166461.41},{"entity":"Apex Industries NA","period":"2025-03","year":2025,"month":3,"total_value":-1261553.59},{"entity":"Apex Industries NA","period":"2025-04","year":2025,"month":4,"total_value":1024695.88},{"entity":"Apex Industries NA","period":"2025-05","year":2025,"month":5,"total_value":-427551.59},{"entity":"Apex Industries NA","period":"2025-06","year":2025,"month":6,"total_value":685897.48},{"entity":"Apex Industries NA","period":"2025-07","year":2025,"month":7,"total_value":-1074978.64},{"entity":"Apex Industries NA","period":"2025-08","year":2025,"month":8,"total_value":1432637.61},{"entity":"Apex Industries NA","period":"2025-09","year":2025,"month":9,"total_value":-1225889.98},{"entity":"Apex Industries NA","period":"2025-10","year":2025,"month":10,"total_value":804267.02},{"entity":"Apex Industries NA","period":"2025-11","year":2025,"month":11,"total_value":-477867.48},{"entity":"Apex Industries NA","period":"2025-12","year":2025,"month":12,"total_value":-238019.83},{"entity":"Apex Industries NA","period":"2026-01","year":2026,"month":1,"total_value":172638.78},{"entity":"Apex Mexico","period":"2022-01","year":2022,"month":1,"total_value":2280285.08},{"entity":"Apex Mexico","period":"2022-02","year":2022,"month":2,"total_value":3121580.79},{"entity":"Apex Mexico","period":"2022-03","year":2022,"month":3,"total_value":1760001.05},{"entity":"Apex Mexico","period":"2022-04","year":2022,"month":4,"total_value":3080736.14},{"entity":"Apex Mexico","period":"2022-05","year":2022,"month":5,"total_value":765699.44},{"entity":"Apex Mexico","period":"2022-06","year":2022,"month":6,"total_value":2432175.68},{"entity":"Apex Mexico","period":"2022-07","year":2022,"month":7,"total_value":1600050.76},{"entity":"Apex Mexico","period":"2022-08","year":2022,"month":8,"total_value":2258748.15},{"entity":"Apex Mexico","period":"2022-09","year":2022,"month":9,"total_value":1381085.44},{"entity":"Apex Mexico","period":"2022-10","year":2022,"month":10,"total_value":1682093.94},{"entity":"Apex Mexico","period":"2022-11","year":2022,"month":11,"total_value":2163551.05},{"entity":"Apex Mexico","period":"2022-12","year":2022,"month":12,"total_value":953736.46},{"entity":"Apex Mexico","period":"2023-01","year":2023,"month":1,"total_value":2040048.66},{"entity":"Apex Mexico","period":"2023-02","year":2023,"month":2,"total_value":1568127.27},{"entity":"Apex Mexico","period":"2023-03","year":2023,"month":3,"total_value":1780015.78},{"entity":"Apex Mexico","period":"2023-04","year":2023,"month":4,"total_value":2162012.87},{"entity":"Apex Mexico","period":"2023-05","year":2023,"month":5,"total_value":1297165.19},{"entity":"Apex Mexico","period":"2023-06","year":2023,"month":6,"total_value":1441476.22},{"entity":"Apex Mexico","period":"2023-07","year":2023,"month":7,"total_value":1523819.14},{"entity":"Apex Mexico","period":"2023-08","year":2023,"month":8,"total_value":2048765.38},{"entity":"Apex Mexico","period":"2023-09","year":2023,"month":9,"total_value":1689213.52},{"entity":"Apex Mexico","period":"2023-10","year":2023,"month":10,"total_value":1892441.68},{"entity":"Apex Mexico","period":"2023-11","year":2023,"month":11,"total_value":3053879.29},{"entity":"Apex Mexico","period":"2023-12","year":2023,"month":12,"total_value":1628617.82},{"entity":"Apex Mexico","period":"2024-01","year":2024,"month":1,"total_value":786699.4},{"entity":"Apex Mexico","period":"2024-02","year":2024,"month":2,"total_value":2498116.24},{"entity":"Apex Mexico","period":"2024-03","year":2024,"month":3,"total_value":1218453.52},{"entity":"Apex Mexico","period":"2024-04","year":2024,"month":4,"total_value":1400095.48},{"entity":"Apex Mexico","period":"2024-05","year":2024,"month":5,"total_value":1387613.02},{"entity":"Apex Mexico","period":"2024-06","year":2024,"month":6,"total_value":2028699.75},{"entity":"Apex Mexico","period":"2024-07","year":2024,"month":7,"total_value":1589038.38},{"entity":"Apex Mexico","period":"2024-08","year":2024,"month":8,"total_value":2032489.49},{"entity":"Apex Mexico","period":"2024-09","year":2024,"month":9,"total_value":1492853.54},{"entity":"Apex Mexico","period":"2024-10","year":2024,"month":10,"total_value":2206894.15},{"entity":"Apex Mexico","period":"2024-11","year":2024,"month":11,"total_value":1597985.07},{"entity":"Apex Mexico","period":"2024-12","year":2024,"month":12,"total_value":1505791.3},{"entity":"Apex Mexico","period":"2025-01","year":2025,"month":1,"total_value":381791.19},{"entity":"Apex Motorsports Inc","period":"2022-01","year":2022,"month":1,"total_value":21613.91},{"entity":"Apex Motorsports Inc","period":"2022-02","year":2022,"month":2,"total_value":-100052.88},{"entity":"Apex Motorsports Inc","period":"2022-03","year":2022,"month":3,"total_value":196613.64},{"entity":"Apex Motorsports Inc","period":"2022-04","year":2022,"month":4,"total_value":-232024.21},{"entity":"Apex Motorsports Inc","period":"2022-05","year":2022,"month":5,"total_value":89060.85},{"entity":"Apex Motorsports Inc","period":"2022-06","year":2022,"month":6,"total_value":-26748.01},{"entity":"Apex Motorsports Inc","period":"2022-07","year":2022,"month":7,"total_value":96093.47},{"entity":"Apex Motorsports Inc","period":"2022-08","year":2022,"month":8,"total_value":29085.68},{"entity":"Apex Motorsports Inc","period":"2022-09","year":2022,"month":9,"total_value":-153374.39},{"entity":"Apex Motorsports Inc","period":"2022-10","year":2022,"month":10,"total_value":59440.33},{"entity":"Apex Motorsports Inc","period":"2022-11","year":2022,"month":11,"total_value":186706.09},{"entity":"Apex Motorsports Inc","period":"2022-12","year":2022,"month":12,"total_value":72455.82},{"entity":"Apex Motorsports Inc","period":"2023-01","year":2023,"month":1,"total_value":-46640.89},{"entity":"Apex Motorsports Inc","period":"2023-02","year":2023,"month":2,"total_value":-21406.15},{"entity":"Apex Motorsports Inc","period":"2023-03","year":2023,"month":3,"total_value":16748.87},{"entity":"Apex Motorsports Inc","period":"2023-04","year":2023,"month":4,"total_value":-45449.0},{"entity":"Apex Motorsports Inc","period":"2023-05","year":2023,"month":5,"total_value":-168454.23},{"entity":"Apex Motorsports Inc","period":"2023-06","year":2023,"month":6,"total_value":-107254.19},{"entity":"Apex Motorsports Inc","period":"2023-07","year":2023,"month":7,"total_value":100527.47},{"entity":"Apex Motorsports Inc","period":"2023-08","year":2023,"month":8,"total_value":39965.28},{"entity":"Apex Motorsports Inc","period":"2023-09","year":2023,"month":9,"total_value":-6524.15},{"entity":"Apex Motorsports Inc","period":"2023-10","year":2023,"month":10,"total_value":19186.5},{"entity":"Apex Motorsports Inc","period":"2023-11","year":2023,"month":11,"total_value":-55779.5},{"entity":"Apex Motorsports Inc","period":"2023-12","year":2023,"month":12,"total_value":104738.97},{"entity":"Apex Motorsports Inc","period":"2024-01","year":2024,"month":1,"total_value":108498.63},{"entity":"Apex Motorsports Inc","period":"2024-02","year":2024,"month":2,"total_value":-198327.52},{"entity":"Apex Motorsports Inc","period":"2024-03","year":2024,"month":3,"total_value":119143.53},{"entity":"Apex Motorsports Inc","period":"2024-04","year":2024,"month":4,"total_value":91200.53},{"entity":"Apex Motorsports Inc","period":"2024-05","year":2024,"month":5,"total_value":-174026.56},{"entity":"Apex Motorsports Inc","period":"2024-06","year":2024,"month":6,"total_value":75786.04},{"entity":"Apex Motorsports Inc","period":"2024-07","year":2024,"month":7,"total_value":104099.2},{"entity":"Apex Motorsports Inc","period":"2024-08","year":2024,"month":8,"total_value":-128264.28},{"entity":"Apex Motorsports Inc","period":"2024-09","year":2024,"month":9,"total_value":152476.32},{"entity":"Apex Motorsports Inc","period":"2024-10","year":2024,"month":10,"total_value":204742.74},{"entity":"Apex Motorsports Inc","period":"2024-11","year":2024,"month":11,"total_value":-59694.35},{"entity":"Apex Motorsports Inc","period":"2024-12","year":2024,"month":12,"total_value":179453.82},{"entity":"Apex Motorsports Inc","period":"2025-01","year":2025,"month":1,"total_value":-94777.38},{"entity":"Apex Motorsports Inc","period":"2025-02","year":2025,"month":2,"total_value":185714.6},{"entity":"Apex Motorsports Inc","period":"2025-03","year":2025,"month":3,"total_value":-135124.36},{"entity":"Apex Motorsports Inc","period":"2025-04","year":2025,"month":4,"total_value":10862.31},{"entity":"Apex Motorsports Inc","period":"2025-05","year":2025,"month":5,"total_value":178272.58},{"entity":"Apex Motorsports Inc","period":"2025-06","year":2025,"month":6,"total_value":-155697.47},{"entity":"Apex Motorsports Inc","period":"2025-07","year":2025,"month":7,"total_value":65918.76},{"entity":"Apex Motorsports Inc","period":"2025-08","year":2025,"month":8,"total_value":99063.56},{"entity":"Apex Motorsports Inc","period":"2025-09","year":2025,"month":9,"total_value":-232869.96},{"entity":"Apex Motorsports Inc","period":"2025-10","year":2025,"month":10,"total_value":99591.52},{"entity":"Apex Motorsports Inc","period":"2025-11","year":2025,"month":11,"total_value":192083.42},{"entity":"Apex Motorsports Inc","period":"2025-12","year":2025,"month":12,"total_value":485057.62},{"entity":"Apex Motorsports Inc","period":"2026-01","year":2026,"month":1,"total_value":0.0},{"entity":"Apex Racing NA","period":"2022-01","year":2022,"month":1,"total_value":0.0},{"entity":"Apex Racing NA","period":"2022-02","year":2022,"month":2,"total_value":0.0},{"entity":"Apex Racing NA","period":"2022-03","year":2022,"month":3,"total_value":0.0},{"entity":"Apex Racing NA","period":"2022-04","year":2022,"month":4,"total_value":0.0},{"entity":"Apex Racing NA","period":"2022-05","year":2022,"month":5,"total_value":0.0},{"entity":"Apex Racing NA","period":"2022-06","year":2022,"month":6,"total_value":0.0},{"entity":"Apex Racing NA","period":"2022-07","year":2022,"month":7,"total_value":0.0},{"entity":"Apex Racing NA","period":"2022-08","year":2022,"month":8,"total_value":0.0},{"entity":"Apex Racing NA","period":"2022-09","year":2022,"month":9,"total_value":0.0},{"entity":"Apex Racing NA","period":"2022-10","year":2022,"month":10,"total_value":0.0},{"entity":"Apex Racing NA","period":"2022-11","year":2022,"month":11,"total_value":0.0},{"entity":"Apex Racing NA","period":"2022-12","year":2022,"month":12,"total_value":0.0},{"entity":"Apex Racing NA","period":"2023-01","year":2023,"month":1,"total_value":0.0},{"entity":"Apex Racing NA","period":"2023-02","year":2023,"month":2,"total_value":0.0},{"entity":"Apex Racing NA","period":"2023-03","year":2023,"month":3,"total_value":0.0},{"entity":"Apex Racing NA","period":"2023-04","year":2023,"month":4,"total_value":0.0},{"entity":"Apex Racing NA","period":"2023-05","year":2023,"month":5,"total_value":0.0},{"entity":"Apex Racing NA","period":"2023-06","year":2023,"month":6,"total_value":0.0},{"entity":"Apex Racing NA","period":"2023-07","year":2023,"month":7,"total_value":0.0},{"entity":"Apex Racing NA","period":"2023-08","year":2023,"month":8,"total_value":0.0},{"entity":"Apex Racing NA","period":"2023-09","year":2023,"month":9,"total_value":0.0},{"entity":"Apex Racing NA","period":"2023-10","year":2023,"month":10,"total_value":0.0},{"entity":"Apex Racing NA","period":"2023-11","year":2023,"month":11,"total_value":0.0},{"entity":"Apex Racing NA","period":"2023-12","year":2023,"month":12,"total_value":0.0},{"entity":"Apex Racing NA","period":"2024-01","year":2024,"month":1,"total_value":0.0},{"entity":"Apex Racing NA","period":"2024-02","year":2024,"month":2,"total_value":0.0},{"entity":"Apex Racing NA","period":"2024-03","year":2024,"month":3,"total_value":0.0},{"entity":"Apex Racing NA","period":"2024-04","year":2024,"month":4,"total_value":0.0},{"entity":"Apex Racing NA","period":"2024-05","year":2024,"month":5,"total_value":0.0},{"entity":"Apex Racing NA","period":"2024-06","year":2024,"month":6,"total_value":0.0},{"entity":"Apex Racing NA","period":"2024-07","year":2024,"month":7,"total_value":0.0},{"entity":"Apex Racing NA","period":"2024-08","year":2024,"month":8,"total_value":0.0},{"entity":"Apex Racing NA","period":"2024-09","year":2024,"month":9,"total_value":0.0},{"entity":"Apex Racing NA","period":"2024-10","year":2024,"month":10,"total_value":0.0},{"entity":"Apex Racing NA","period":"2024-11","year":2024,"month":11,"total_value":0.0},{"entity":"Apex Racing NA","period":"2024-12","year":2024,"month":12,"total_value":0.0},{"entity":"Apex Racing NA","period":"2025-01","year":2025,"month":1,"total_value":2041645.64},{"entity":"Horizon Mobility","period":"2022-01","year":2022,"month":1,"total_value":0.0},{"entity":"Horizon Mobility","period":"2022-02","year":2022,"month":2,"total_value":0.0},{"entity":"Horizon Mobility","period":"2022-03","year":2022,"month":3,"total_value":-109179.16},{"entity":"Horizon Mobility","period":"2022-04","year":2022,"month":4,"total_value":-432414.0},{"entity":"Horizon Mobility","period":"2022-05","year":2022,"month":5,"total_value":-143680.0},{"entity":"Horizon Mobility","period":"2022-06","year":2022,"month":6,"total_value":645521.71},{"entity":"Horizon Mobility","period":"2022-07","year":2022,"month":7,"total_value":34066.8},{"entity":"Horizon Mobility","period":"2022-08","year":2022,"month":8,"total_value":-23251.32},{"entity":"Horizon Mobility","period":"2022-09","year":2022,"month":9,"total_value":23430.27},{"entity":"Horizon Mobility","period":"2022-10","year":2022,"month":10,"total_value":-14493.05},{"entity":"Horizon Mobility","period":"2022-11","year":2022,"month":11,"total_value":17271.25},{"entity":"Horizon Mobility","period":"2022-12","year":2022,"month":12,"total_value":-2731.85},{"entity":"Horizon Mobility","period":"2023-01","year":2023,"month":1,"total_value":-526748.01},{"entity":"Horizon Mobility","period":"2023-02","year":2023,"month":2,"total_value":-530670.89},{"entity":"Horizon Mobility","period":"2023-03","year":2023,"month":3,"total_value":-2483865.88},{"entity":"Horizon Mobility","period":"2023-04","year":2023,"month":4,"total_value":-64814.11},{"entity":"Horizon Mobility","period":"2023-05","year":2023,"month":5,"total_value":152603.31},{"entity":"Horizon Mobility","period":"2023-06","year":2023,"month":6,"total_value":739664.46},{"entity":"Horizon Mobility","period":"2023-07","year":2023,"month":7,"total_value":-1222006.13},{"entity":"Horizon Mobility","period":"2023-08","year":2023,"month":8,"total_value":-223126.28},{"entity":"Horizon Mobility","period":"2023-09","year":2023,"month":9,"total_value":-180201.7},{"entity":"Horizon Mobility","period":"2023-10","year":2023,"month":10,"total_value":-357915.35},{"entity":"Horizon Mobility","period":"2023-11","year":2023,"month":11,"total_value":-306690.49},{"entity":"Horizon Mobility","period":"2023-12","year":2023,"month":12,"total_value":-328429.22},{"entity":"Horizon Mobility","period":"2024-01","year":2024,"month":1,"total_value":-295456.86},{"entity":"Horizon Mobility","period":"2024-02","year":2024,"month":2,"total_value":465274.93},{"entity":"Horizon Mobility","period":"2024-03","year":2024,"month":3,"total_value":-109588.38},{"entity":"Horizon Mobility","period":"2024-04","year":2024,"month":4,"total_value":-152714.29},{"entity":"Horizon Mobility","period":"2024-05","year":2024,"month":5,"total_value":601469.35},{"entity":"Horizon Mobility","period":"2024-06","year":2024,"month":6,"total_value":-1298809.97},{"entity":"Horizon Mobility","period":"2024-07","year":2024,"month":7,"total_value":-107940.15},{"entity":"Horizon Mobility","period":"2024-08","year":2024,"month":8,"total_value":-2669610.92},{"entity":"Horizon Mobility","period":"2024-09","year":2024,"month":9,"total_value":-188764.5},{"entity":"Horizon Mobility","period":"2024-10","year":2024,"month":10,"total_value":-544694.21},{"entity":"Horizon Mobility","period":"2024-11","year":2024,"month":11,"total_value":136359.52},{"entity":"Horizon Mobility","period":"2024-12","year":2024,"month":12,"total_value":-490402.03},{"entity":"Horizon Mobility","period":"2025-01","year":2025,"month":1,"total_value":-734956.2},{"entity":"Horizon Mobility","period":"2025-02","year":2025,"month":2,"total_value":460378.87},{"entity":"Horizon Mobility","period":"2025-03","year":2025,"month":3,"total_value":976863.11},{"entity":"Horizon Mobility","period":"2025-04","year":2025,"month":4,"total_value":-480588.36},{"entity":"Horizon Mobility","period":"2025-05","year":2025,"month":5,"total_value":1125335.86},{"entity":"Horizon Mobility","period":"2025-06","year":2025,"month":6,"total_value":830179.99},{"entity":"Horizon Mobility","period":"2025-07","year":2025,"month":7,"total_value":587398.06},{"entity":"Horizon Mobility","period":"2025-08","year":2025,"month":8,"total_value":426888.24},{"entity":"Horizon Mobility","period":"2025-09","year":2025,"month":9,"total_value":999904.71},{"entity":"Horizon Mobility","period":"2025-10","year":2025,"month":10,"total_value":240902.86},{"entity":"Horizon Mobility","period":"2025-11","year":2025,"month":11,"total_value":645485.84},{"entity":"Horizon Mobility","period":"2025-12","year":2025,"month":12,"total_value":418989.35},{"entity":"Horizon Mobility","period":"2026-01","year":2026,"month":1,"total_value":38551.85},{"entity":"Summit Motorsports Inc","period":"2022-01","year":2022,"month":1,"total_value":-15171.31},{"entity":"Summit Motorsports Inc","period":"2022-02","year":2022,"month":2,"total_value":29200.0},{"entity":"Summit Motorsports Inc","period":"2022-03","year":2022,"month":3,"total_value":-27150.0},{"entity":"Summit Motorsports Inc","period":"2022-04","year":2022,"month":4,"total_value":7350.0},{"entity":"Summit Motorsports Inc","period":"2022-05","year":2022,"month":5,"total_value":21450.0},{"entity":"Summit Motorsports Inc","period":"2022-06","year":2022,"month":6,"total_value":7500.0},{"entity":"Summit Motorsports Inc","period":"2022-07","year":2022,"month":7,"total_value":6750.0},{"entity":"Summit Motorsports Inc","period":"2022-08","year":2022,"month":8,"total_value":-28000.0},{"entity":"Summit Motorsports Inc","period":"2022-09","year":2022,"month":9,"total_value":9400.0},{"entity":"Summit Motorsports Inc","period":"2022-10","year":2022,"month":10,"total_value":17800.0},{"entity":"Summit Motorsports Inc","period":"2022-11","year":2022,"month":11,"total_value":-21900.0},{"entity":"Summit Motorsports Inc","period":"2022-12","year":2022,"month":12,"total_value":129224.0},{"entity":"Summit Motorsports Inc","period":"2023-01","year":2023,"month":1,"total_value":-13757.0},{"entity":"Summit Motorsports Inc","period":"2023-02","year":2023,"month":2,"total_value":-98723.0},{"entity":"Summit Motorsports Inc","period":"2023-03","year":2023,"month":3,"total_value":45363.0},{"entity":"Summit Motorsports Inc","period":"2023-04","year":2023,"month":4,"total_value":-289512.67},{"entity":"Summit Motorsports Inc","period":"2023-05","year":2023,"month":5,"total_value":-408223.47},{"entity":"Summit Motorsports Inc","period":"2023-06","year":2023,"month":6,"total_value":763353.14},{"entity":"Summit Motorsports Inc","period":"2023-07","year":2023,"month":7,"total_value":-13020.0},{"entity":"Summit Motorsports Inc","period":"2023-08","year":2023,"month":8,"total_value":-87793.0},{"entity":"Summit Motorsports Inc","period":"2023-09","year":2023,"month":9,"total_value":-31889.42},{"entity":"Summit Motorsports Inc","period":"2023-10","year":2023,"month":10,"total_value":-4060.3},{"entity":"Summit Motorsports Inc","period":"2023-11","year":2023,"month":11,"total_value":21565.72},{"entity":"Summit Motorsports Inc","period":"2023-12","year":2023,"month":12,"total_value":116697.0},{"entity":"Summit Motorsports Inc","period":"2024-01","year":2024,"month":1,"total_value":-59268.0},{"entity":"Summit Motorsports Inc","period":"2024-02","year":2024,"month":2,"total_value":-17456.0},{"entity":"Summit Motorsports Inc","period":"2024-03","year":2024,"month":3,"total_value":-775794.29},{"entity":"Summit Motorsports Inc","period":"2024-04","year":2024,"month":4,"total_value":763977.59},{"entity":"Summit Motorsports Inc","period":"2024-05","year":2024,"month":5,"total_value":-69292.3},{"entity":"Summit Motorsports Inc","period":"2024-06","year":2024,"month":6,"total_value":156333.0},{"entity":"Summit Motorsports Inc","period":"2024-07","year":2024,"month":7,"total_value":-400270.7},{"entity":"Summit Motorsports Inc","period":"2024-08","year":2024,"month":8,"total_value":223065.8},{"entity":"Summit Motorsports Inc","period":"2024-09","year":2024,"month":9,"total_value":132037.9},{"entity":"Summit Motorsports Inc","period":"2024-10","year":2024,"month":10,"total_value":-159993.75},{"entity":"Summit Motorsports Inc","period":"2024-11","year":2024,"month":11,"total_value":108808.35},{"entity":"Summit Motorsports Inc","period":"2024-12","year":2024,"month":12,"total_value":76698.4},{"entity":"Summit Motorsports Inc","period":"2025-01","year":2025,"month":1,"total_value":-71240.4},{"entity":"Summit Motorsports Inc","period":"2025-02","year":2025,"month":2,"total_value":38020.25},{"entity":"Summit Motorsports Inc","period":"2025-03","year":2025,"month":3,"total_value":-109989.85},{"entity":"Summit Motorsports Inc","period":"2025-04","year":2025,"month":4,"total_value":59447.07},{"entity":"Summit Motorsports Inc","period":"2025-05","year":2025,"month":5,"total_value":-144526.07},{"entity":"Summit Motorsports Inc","period":"2025-06","year":2025,"month":6,"total_value":197521.0},{"entity":"Summit Motorsports Inc","period":"2025-07","year":2025,"month":7,"total_value":-27283.0},{"entity":"Summit Motorsports Inc","period":"2025-08","year":2025,"month":8,"total_value":-31077.25},{"entity":"Summit Motorsports Inc","period":"2025-09","year":2025,"month":9,"total_value":103167.26},{"entity":"Summit Motorsports Inc","period":"2025-10","year":2025,"month":10,"total_value":-84245.0},{"entity":"Summit Motorsports Inc","period":"2025-11","year":2025,"month":11,"total_value":60610.0},{"entity":"Summit Motorsports Inc","period":"2025-12","year":2025,"month":12,"total_value":30749.99},{"entity":"Summit Motorsports Inc","period":"2026-01","year":2026,"month":1,"total_value":-68751.0},{"entity":"Summit Products NA","period":"2022-01","year":2022,"month":1,"total_value":1558609.0},{"entity":"Summit Products NA","period":"2022-02","year":2022,"month":2,"total_value":464752.03},{"entity":"Summit Products NA","period":"2022-03","year":2022,"month":3,"total_value":1039149.2},{"entity":"Summit Products NA","period":"2022-04","year":2022,"month":4,"total_value":3933733.63},{"entity":"Summit Products NA","period":"2022-05","year":2022,"month":5,"total_value":-5762381.17},{"entity":"Summit Products NA","period":"2022-06","year":2022,"month":6,"total_value":-671714.73},{"entity":"Summit Products NA","period":"2022-07","year":2022,"month":7,"total_value":-1129289.2},{"entity":"Summit Products NA","period":"2022-08","year":2022,"month":8,"total_value":972796.25},{"entity":"Summit Products NA","period":"2022-09","year":2022,"month":9,"total_value":3758862.51},{"entity":"Summit Products NA","period":"2022-10","year":2022,"month":10,"total_value":2625481.33},{"entity":"Summit Products NA","period":"2022-11","year":2022,"month":11,"total_value":400604.55},{"entity":"Summit Products NA","period":"2022-12","year":2022,"month":12,"total_value":121409.3},{"entity":"Summit Products NA","period":"2023-01","year":2023,"month":1,"total_value":-1146303.53},{"entity":"Summit Products NA","period":"2023-02","year":2023,"month":2,"total_value":-776308.31},{"entity":"Summit Products NA","period":"2023-03","year":2023,"month":3,"total_value":1455684.76},{"entity":"Summit Products NA","period":"2023-04","year":2023,"month":4,"total_value":-396435.5},{"entity":"Summit Products NA","period":"2023-05","year":2023,"month":5,"total_value":689472.17},{"entity":"Summit Products NA","period":"2023-06","year":2023,"month":6,"total_value":574362.28},{"entity":"Summit Products NA","period":"2023-07","year":2023,"month":7,"total_value":-2291555.4},{"entity":"Summit Products NA","period":"2023-08","year":2023,"month":8,"total_value":-2214819.05},{"entity":"Summit Products NA","period":"2023-09","year":2023,"month":9,"total_value":3242042.75},{"entity":"Summit Products NA","period":"2023-10","year":2023,"month":10,"total_value":-2655778.98},{"entity":"Summit Products NA","period":"2023-11","year":2023,"month":11,"total_value":4883303.63},{"entity":"Summit Products NA","period":"2023-12","year":2023,"month":12,"total_value":917794.24},{"entity":"Summit Products NA","period":"2024-01","year":2024,"month":1,"total_value":241766.67},{"entity":"Summit Products NA","period":"2024-02","year":2024,"month":2,"total_value":-36402.07},{"entity":"Summit Products NA","period":"2024-03","year":2024,"month":3,"total_value":-180215.87},{"entity":"Summit Products NA","period":"2024-04","year":2024,"month":4,"total_value":-107780.4},{"entity":"Summit Products NA","period":"2024-05","year":2024,"month":5,"total_value":71204.53},{"entity":"Summit Products NA","period":"2024-06","year":2024,"month":6,"total_value":136374.92},{"entity":"Summit Products NA","period":"2024-07","year":2024,"month":7,"total_value":-144805.91},{"entity":"Summit Products NA","period":"2024-08","year":2024,"month":8,"total_value":-322901.33},{"entity":"Summit Products NA","period":"2024-09","year":2024,"month":9,"total_value":-590370.11},{"entity":"Summit Products NA","period":"2024-10","year":2024,"month":10,"total_value":-8283866.0},{"entity":"Summit Products NA","period":"2024-11","year":2024,"month":11,"total_value":5837018.0},{"entity":"Summit Products NA","period":"2024-12","year":2024,"month":12,"total_value":503827.0},{"entity":"Summit Products NA","period":"2025-01","year":2025,"month":1,"total_value":2072945.0},{"entity":"Summit Products NA","period":"2025-02","year":2025,"month":2,"total_value":-77609.47},{"entity":"Summit Products NA","period":"2025-03","year":2025,"month":3,"total_value":-1820364.84},{"entity":"Summit Products NA","period":"2025-04","year":2025,"month":4,"total_value":606132.81},{"entity":"Summit Products NA","period":"2025-05","year":2025,"month":5,"total_value":652066.46},{"entity":"Summit Products NA","period":"2025-06","year":2025,"month":6,"total_value":-2981566.64},{"entity":"Summit Products NA","period":"2025-07","year":2025,"month":7,"total_value":1540874.59},{"entity":"Summit Products NA","period":"2025-08","year":2025,"month":8,"total_value":-697325.72},{"entity":"Summit Products NA","period":"2025-09","year":2025,"month":9,"total_value":-325583.21},{"entity":"Summit Products NA","period":"2025-10","year":2025,"month":10,"total_value":-4140056.78},{"entity":"Summit Products NA","period":"2025-11","year":2025,"month":11,"total_value":2229786.19},{"entity":"Summit Products NA","period":"2025-12","year":2025,"month":12,"total_value":174903.27},{"entity":"Summit Products NA","period":"2026-01","year":2026,"month":1,"total_value":172638.78},{"entity":"TechSuspension NA","period":"2022-01","year":2022,"month":1,"total_value":117062.13},{"entity":"TechSuspension NA","period":"2022-02","year":2022,"month":2,"total_value":-74296.16},{"entity":"TechSuspension NA","period":"2022-03","year":2022,"month":3,"total_value":-131976.53},{"entity":"TechSuspension NA","period":"2022-04","year":2022,"month":4,"total_value":114094.36},{"entity":"TechSuspension NA","period":"2022-05","year":2022,"month":5,"total_value":-143047.85},{"entity":"TechSuspension NA","period":"2022-06","year":2022,"month":6,"total_value":158146.09},{"entity":"TechSuspension NA","period":"2022-07","year":2022,"month":7,"total_value":-70437.52},{"entity":"TechSuspension NA","period":"2022-08","year":2022,"month":8,"total_value":151043.11},{"entity":"TechSuspension NA","period":"2022-09","year":2022,"month":9,"total_value":-242528.14},{"entity":"TechSuspension NA","period":"2022-10","year":2022,"month":10,"total_value":55347.29},{"entity":"TechSuspension NA","period":"2022-11","year":2022,"month":11,"total_value":13949.63},{"entity":"TechSuspension NA","period":"2022-12","year":2022,"month":12,"total_value":-90691.46},{"entity":"TechSuspension NA","period":"2023-01","year":2023,"month":1,"total_value":-19044.67},{"entity":"TechSuspension NA","period":"2023-02","year":2023,"month":2,"total_value":336190.9},{"entity":"TechSuspension NA","period":"2023-03","year":2023,"month":3,"total_value":-648707.13},{"entity":"TechSuspension NA","period":"2023-04","year":2023,"month":4,"total_value":250527.01},{"entity":"TechSuspension NA","period":"2023-05","year":2023,"month":5,"total_value":33063.56},{"entity":"TechSuspension NA","period":"2023-06","year":2023,"month":6,"total_value":-88386.03},{"entity":"TechSuspension NA","period":"2023-07","year":2023,"month":7,"total_value":-43998.6},{"entity":"TechSuspension NA","period":"2023-08","year":2023,"month":8,"total_value":470911.05},{"entity":"TechSuspension NA","period":"2023-09","year":2023,"month":9,"total_value":-181671.94},{"entity":"TechSuspension NA","period":"2023-10","year":2023,"month":10,"total_value":-153586.59},{"entity":"TechSuspension NA","period":"2023-11","year":2023,"month":11,"total_value":-3962.29},{"entity":"TechSuspension NA","period":"2023-12","year":2023,"month":12,"total_value":-63503.91},{"entity":"TechSuspension NA","period":"2024-01","year":2024,"month":1,"total_value":54563.75},{"entity":"TechSuspension NA","period":"2024-02","year":2024,"month":2,"total_value":257700.34},{"entity":"TechSuspension NA","period":"2024-03","year":2024,"month":3,"total_value":-724990.68},{"entity":"TechSuspension NA","period":"2024-04","year":2024,"month":4,"total_value":311972.01},{"entity":"TechSuspension NA","period":"2024-05","year":2024,"month":5,"total_value":214721.0},{"entity":"TechSuspension NA","period":"2024-06","year":2024,"month":6,"total_value":-51125.43},{"entity":"TechSuspension NA","period":"2024-07","year":2024,"month":7,"total_value":-127468.64},{"entity":"TechSuspension NA","period":"2024-08","year":2024,"month":8,"total_value":450837.7},{"entity":"TechSuspension NA","period":"2024-09","year":2024,"month":9,"total_value":-352593.26},{"entity":"TechSuspension NA","period":"2024-10","year":2024,"month":10,"total_value":-164915.68},{"entity":"TechSuspension NA","period":"2024-11","year":2024,"month":11,"total_value":367663.92},{"entity":"TechSuspension NA","period":"2024-12","year":2024,"month":12,"total_value":-176860.96},{"entity":"TechSuspension NA","period":"2025-01","year":2025,"month":1,"total_value":-208017.91},{"entity":"TechSuspension NA","period":"2025-02","year":2025,"month":2,"total_value":485234.39},{"entity":"TechSuspension NA","period":"2025-03","year":2025,"month":3,"total_value":-374679.0},{"entity":"TechSuspension NA","period":"2025-04","year":2025,"month":4,"total_value":32638.24},{"entity":"TechSuspension NA","period":"2025-05","year":2025,"month":5,"total_value":148896.45},{"entity":"TechSuspension NA","period":"2025-06","year":2025,"month":6,"total_value":-376034.75},{"entity":"TechSuspension NA","period":"2025-07","year":2025,"month":7,"total_value":266286.55},{"entity":"TechSuspension NA","period":"2025-08","year":2025,"month":8,"total_value":381090.56},{"entity":"TechSuspension NA","period":"2025-09","year":2025,"month":9,"total_value":-310167.43},{"entity":"TechSuspension NA","period":"2025-10","year":2025,"month":10,"total_value":103864.8},{"entity":"TechSuspension NA","period":"2025-11","year":2025,"month":11,"total_value":-24957.88},{"entity":"TechSuspension NA","period":"2025-12","year":2025,"month":12,"total_value":-67915.41},{"entity":"TechSuspension NA","period":"2026-01","year":2026,"month":1,"total_value":-193490.19},{"entity":"Vega Motors Group","period":"2022-01","year":2022,"month":1,"total_value":0.0},{"entity":"Vega Motors Group","period":"2022-02","year":2022,"month":2,"total_value":0.0},{"entity":"Vega Motors Group","period":"2022-03","year":2022,"month":3,"total_value":0.0},{"entity":"Vega Motors Group","period":"2022-04","year":2022,"month":4,"total_value":0.0},{"entity":"Vega Motors Group","period":"2022-05","year":2022,"month":5,"total_value":0.0},{"entity":"Vega Motors Group","period":"2022-06","year":2022,"month":6,"total_value":0.0},{"entity":"Vega Motors Group","period":"2022-07","year":2022,"month":7,"total_value":0.0},{"entity":"Vega Motors Group","period":"2022-08","year":2022,"month":8,"total_value":0.0},{"entity":"Vega Motors Group","period":"2022-09","year":2022,"month":9,"total_value":0.0},{"entity":"Vega Motors Group","period":"2022-10","year":2022,"month":10,"total_value":0.0},{"entity":"Vega Motors Group","period":"2022-11","year":2022,"month":11,"total_value":0.0},{"entity":"Vega Motors Group","period":"2022-12","year":2022,"month":12,"total_value":0.0},{"entity":"Vega Motors Group","period":"2023-01","year":2023,"month":1,"total_value":0.0},{"entity":"Vega Motors Group","period":"2023-02","year":2023,"month":2,"total_value":0.0},{"entity":"Vega Motors Group","period":"2023-03","year":2023,"month":3,"total_value":0.0},{"entity":"Vega Motors Group","period":"2023-04","year":2023,"month":4,"total_value":0.0},{"entity":"Vega Motors Group","period":"2023-05","year":2023,"month":5,"total_value":0.0},{"entity":"Vega Motors Group","period":"2023-06","year":2023,"month":6,"total_value":0.0},{"entity":"Vega Motors Group","period":"2023-07","year":2023,"month":7,"total_value":0.0},{"entity":"Vega Motors Group","period":"2023-08","year":2023,"month":8,"total_value":0.0},{"entity":"Vega Motors Group","period":"2023-09","year":2023,"month":9,"total_value":0.0},{"entity":"Vega Motors Group","period":"2023-10","year":2023,"month":10,"total_value":0.0},{"entity":"Vega Motors Group","period":"2023-11","year":2023,"month":11,"total_value":0.0},{"entity":"Vega Motors Group","period":"2023-12","year":2023,"month":12,"total_value":0.0},{"entity":"Vega Motors Group","period":"2024-06","year":2024,"month":6,"total_value":0.0},{"entity":"Vega Motors Group","period":"2024-07","year":2024,"month":7,"total_value":-12000.0},{"entity":"Vega Motors Group","period":"2024-08","year":2024,"month":8,"total_value":0.0},{"entity":"Vega Motors Group","period":"2024-09","year":2024,"month":9,"total_value":-6128.57},{"entity":"Vega Motors Group","period":"2024-10","year":2024,"month":10,"total_value":0.0},{"entity":"Vega Motors Group","period":"2024-11","year":2024,"month":11,"total_value":0.0},{"entity":"Vega Motors Group","period":"2024-12","year":2024,"month":12,"total_value":128.16},{"entity":"Vega Motors Group","period":"2025-01","year":2025,"month":1,"total_value":0.0},{"entity":"Vega Motors Group","period":"2025-02","year":2025,"month":2,"total_value":0.0},{"entity":"Vega Motors Group","period":"2025-03","year":2025,"month":3,"total_value":0.0},{"entity":"Vega Motors Group","period":"2025-04","year":2025,"month":4,"total_value":0.0},{"entity":"Vega Motors Group","period":"2025-05","year":2025,"month":5,"total_value":0.0},{"entity":"Vega Motors Group","period":"2025-06","year":2025,"month":6,"total_value":0.0},{"entity":"Vega Motors Group","period":"2025-07","year":2025,"month":7,"total_value":0.0},{"entity":"Vega Motors Group","period":"2025-08","year":2025,"month":8,"total_value":0.0},{"entity":"Vega Motors Group","period":"2025-09","year":2025,"month":9,"total_value":862347.58},{"entity":"Velocity Brands NA","period":"2024-07","year":2024,"month":7,"total_value":-13244673.85},{"entity":"Velocity Brands NA","period":"2024-08","year":2024,"month":8,"total_value":2078577.15},{"entity":"Velocity Brands NA","period":"2024-09","year":2024,"month":9,"total_value":946320.93},{"entity":"Velocity Brands NA","period":"2024-10","year":2024,"month":10,"total_value":1464086.71},{"entity":"Velocity Brands NA","period":"2024-11","year":2024,"month":11,"total_value":1011728.5},{"entity":"Velocity Brands NA","period":"2024-12","year":2024,"month":12,"total_value":2097604.41},{"entity":"Velocity Brands NA","period":"2025-01","year":2025,"month":1,"total_value":919045.5},{"entity":"Velocity Brands NA","period":"2025-02","year":2025,"month":2,"total_value":389304.58},{"entity":"Velocity Brands NA","period":"2025-03","year":2025,"month":3,"total_value":355088.5},{"entity":"Velocity Brands NA","period":"2025-04","year":2025,"month":4,"total_value":-53779.73},{"entity":"Velocity Brands NA","period":"2025-05","year":2025,"month":5,"total_value":-371876.2},{"entity":"Velocity Brands NA","period":"2025-06","year":2025,"month":6,"total_value":176505.87},{"entity":"Velocity Brands NA","period":"2025-07","year":2025,"month":7,"total_value":-300559.04},{"entity":"Velocity Brands NA","period":"2025-08","year":2025,"month":8,"total_value":136765.14},{"entity":"Velocity Brands NA","period":"2025-09","year":2025,"month":9,"total_value":-620979.5},{"entity":"Velocity Brands NA","period":"2025-10","year":2025,"month":10,"total_value":393332.34},{"entity":"Velocity Brands NA","period":"2025-11","year":2025,"month":11,"total_value":-31997.08},{"entity":"Velocity Brands NA","period":"2025-12","year":2025,"month":12,"total_value":1114172.88},{"entity":"Velocity Brands NA","period":"2026-01","year":2026,"month":1,"total_value":1054433.25}]};
+
+const ENTITY_COLORS = [
+  '#4f8ef7','#7c5cff','#00d4aa','#ff6b6b','#f7a84f',
+  '#a0f74f','#f74fa0','#4ff7e8','#f7f04f','#c04ff7','#4ff78a'
+];
+
+let currentView = 'monthly';
+let trendChart, entityBarChart, doughnutChart;
+
+function fmt(val, short=false) {
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '';
+  if (abs >= 1e6) return sign + '$' + (abs/1e6).toFixed(short?1:2) + 'M';
+  if (abs >= 1e3) return sign + '$' + (abs/1e3).toFixed(short?0:1) + 'K';
+  return sign + '$' + abs.toFixed(0);
+}
+
+function getFilteredData() {
+  const entity = document.getElementById('entityFilter').value;
+  const year = document.getElementById('yearFilter').value;
+  return RAW_DATA.monthly.filter(d => 
+    (entity === 'all' || d.entity === entity) &&
+    (year === 'all' || d.year == year)
+  );
+}
+
+function setView(v) {
+  currentView = v;
+  document.getElementById('btnMonthly').classList.toggle('active', v === 'monthly');
+  document.getElementById('btnAnnual').classList.toggle('active', v === 'annual');
+  document.getElementById('trendLabel').textContent = v === 'monthly' ? 'Monthly' : 'Annual';
+  updateDashboard();
+}
+
+function updateDashboard() {
+  const filtered = getFilteredData();
+  updateKPIs(filtered);
+  updateTrendChart(filtered);
+  updateEntityCharts(filtered);
+  updateTable(filtered);
+}
+
+function updateKPIs(data) {
+  const total = data.reduce((s, d) => s + d.total_value, 0);
+  const avg = data.length > 0 ? total / data.length : 0;
+  
+  // Group by period for peak
+  const byPeriod = {};
+  data.forEach(d => {
+    byPeriod[d.period] = (byPeriod[d.period] || 0) + d.total_value;
+  });
+  const periods = Object.entries(byPeriod);
+  const peakEntry = periods.reduce((best, curr) => Math.abs(curr[1]) > Math.abs(best[1]) ? curr : best, ['', 0]);
+  
+  // Active entities
+  const entities = new Set(data.filter(d => d.total_value !== 0).map(d => d.entity));
+
+  document.getElementById('kpi1').textContent = fmt(total);
+  document.getElementById('kpi1').className = 'kpi-value ' + (total >= 0 ? 'positive' : 'negative');
+  document.getElementById('kpi2').textContent = fmt(avg);
+  document.getElementById('kpi2').className = 'kpi-value ' + (avg >= 0 ? 'positive' : 'negative');
+  document.getElementById('kpi3').textContent = fmt(peakEntry[1], true);
+  document.getElementById('kpi3sub').textContent = peakEntry[0] || '—';
+  document.getElementById('kpi4').textContent = entities.size;
+}
+
+function updateTrendChart(data) {
+  const ctx = document.getElementById('trendChart');
+  if (trendChart) trendChart.destroy();
+
+  const entity = document.getElementById('entityFilter').value;
+  const entities = entity === 'all' ? RAW_DATA.entities : [entity];
+
+  if (currentView === 'monthly') {
+    // Get all unique periods sorted
+    const allPeriods = [...new Set(data.map(d => d.period))].sort();
+    
+    // Build datasets per entity (only entities with data)
+    const datasets = entities.map((e, i) => {
+      const entityData = data.filter(d => d.entity === e);
+      if (entityData.every(d => d.total_value === 0)) return null;
+      const byPeriod = {};
+      entityData.forEach(d => byPeriod[d.period] = d.total_value);
+      return {
+        label: e,
+        data: allPeriods.map(p => byPeriod[p] || 0),
+        borderColor: ENTITY_COLORS[i % ENTITY_COLORS.length],
+        backgroundColor: ENTITY_COLORS[i % ENTITY_COLORS.length] + '18',
+        borderWidth: 1.5,
+        fill: entity !== 'all',
+        tension: 0.3,
+        pointRadius: allPeriods.length > 30 ? 0 : 3,
+        pointHoverRadius: 5,
+      };
+    }).filter(Boolean);
+
+    trendChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels: allPeriods, datasets },
+      options: chartOptions('Net Position (USD)', allPeriods.length > 36)
+    });
+  } else {
+    // Annual view
+    const years = [...new Set(data.map(d => d.year))].sort();
+    const datasets = entities.map((e, i) => {
+      const entityData = data.filter(d => d.entity === e);
+      if (entityData.every(d => d.total_value === 0)) return null;
+      const byYear = {};
+      entityData.forEach(d => byYear[d.year] = (byYear[d.year] || 0) + d.total_value);
+      return {
+        label: e,
+        data: years.map(y => byYear[y] || 0),
+        backgroundColor: ENTITY_COLORS[i % ENTITY_COLORS.length] + 'cc',
+        borderColor: ENTITY_COLORS[i % ENTITY_COLORS.length],
+        borderWidth: 1,
+        borderRadius: 4,
+      };
+    }).filter(Boolean);
+
+    trendChart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: years, datasets },
+      options: {
+        ...chartOptions('Annual Net (USD)', false),
+        scales: {
+          x: { stacked: entity !== 'all', grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#6b7494' } },
+          y: { stacked: entity !== 'all', grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7494', callback: v => fmt(v, true) } }
+        }
+      }
+    });
+  }
+}
+
+function chartOptions(yLabel, skipPoints) {
+  return {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: { color: '#9ba3bf', boxWidth: 10, font: { family: 'DM Mono', size: 11 } }
+      },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#2a3555',
+        borderWidth: 1,
+        titleColor: '#e8eaf2',
+        bodyColor: '#9ba3bf',
+        callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` }
+      }
+    },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#6b7494', maxTicksLimit: 18 } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7494', callback: v => fmt(v, true) } }
+    }
+  };
+}
+
+function updateEntityCharts(data) {
+  // Entity totals
+  const entityTotals = {};
+  data.forEach(d => entityTotals[d.entity] = (entityTotals[d.entity] || 0) + d.total_value);
+  const entries = Object.entries(entityTotals).filter(([,v]) => v !== 0).sort((a,b) => b[1]-a[1]);
+  
+  // Bar chart
+  const barCtx = document.getElementById('entityBar');
+  if (entityBarChart) entityBarChart.destroy();
+  entityBarChart = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: entries.map(([e]) => e.length > 18 ? e.slice(0,16)+'…' : e),
+      datasets: [{
+        data: entries.map(([,v]) => v),
+        backgroundColor: entries.map(([e]) => {
+          const i = RAW_DATA.entities.indexOf(e);
+          return ENTITY_COLORS[i % ENTITY_COLORS.length] + 'cc';
+        }),
+        borderColor: entries.map(([e]) => {
+          const i = RAW_DATA.entities.indexOf(e);
+          return ENTITY_COLORS[i % ENTITY_COLORS.length];
+        }),
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmt(ctx.parsed.x) } } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7494', callback: v => fmt(v, true) } },
+        y: { grid: { display: false }, ticks: { color: '#9ba3bf', font: { size: 11 } } }
+      }
+    }
+  });
+
+  // Doughnut
+  const dCtx = document.getElementById('entityDoughnut');
+  if (doughnutChart) doughnutChart.destroy();
+  const absEntries = entries.map(([e,v]) => [e, Math.abs(v)]).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]);
+  doughnutChart = new Chart(dCtx, {
+    type: 'doughnut',
+    data: {
+      labels: absEntries.map(([e]) => e),
+      datasets: [{
+        data: absEntries.map(([,v]) => v),
+        backgroundColor: absEntries.map(([e]) => {
+          const i = RAW_DATA.entities.indexOf(e);
+          return ENTITY_COLORS[i % ENTITY_COLORS.length] + 'cc';
+        }),
+        borderColor: '#111520',
+        borderWidth: 2,
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#9ba3bf', boxWidth: 10, font: { family: 'DM Mono', size: 10 }, padding: 12 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmt(ctx.parsed)}` } }
+      },
+      cutout: '65%'
+    }
+  });
+}
+
+function updateTable(data) {
+  const entityTotals = {}, entityCounts = {};
+  data.forEach(d => {
+    entityTotals[d.entity] = (entityTotals[d.entity] || 0) + d.total_value;
+    entityCounts[d.entity] = (entityCounts[d.entity] || 0) + 1;
+  });
+  
+  const maxAbs = Math.max(...Object.values(entityTotals).map(Math.abs));
+  const rows = Object.entries(entityTotals)
+    .sort((a,b) => b[1]-a[1])
+    .map(([e, total]) => {
+      const i = RAW_DATA.entities.indexOf(e);
+      const color = ENTITY_COLORS[i % ENTITY_COLORS.length];
+      const avg = entityCounts[e] > 0 ? total / entityCounts[e] : 0;
+      const barW = Math.round((Math.abs(total) / maxAbs) * 80);
+      const dir = total >= 0 ? '▲ Positive' : '▼ Negative';
+      const dirClass = total >= 0 ? 'positive' : 'negative';
+      return `<tr>
+        <td><span class="entity-dot" style="background:${color}"></span>${e}</td>
+        <td class="${dirClass}">${fmt(total)}</td>
+        <td class="${total>=0?'positive':'negative'}">${fmt(avg)}</td>
+        <td><span class="bar-mini" style="width:${barW}px;background:${color}"></span></td>
+        <td class="${dirClass}">${dir}</td>
+      </tr>`;
+    }).join('');
+  
+  document.getElementById('summaryTbody').innerHTML = rows;
+}
+
+// Init
+window.onload = () => {
+  // Populate entity select
+  const sel = document.getElementById('entityFilter');
+  RAW_DATA.entities.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e; opt.textContent = e;
+    sel.appendChild(opt);
+  });
+  
+  Chart.defaults.color = '#9ba3bf';
+  Chart.defaults.font.family = 'DM Mono';
+  
+  updateDashboard();
+};
+</script>
+</body>
+</html>
